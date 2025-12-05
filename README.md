@@ -1,0 +1,2 @@
+# manosaba-utils
+self-use

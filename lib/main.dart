@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'anan_sketchbook_page.dart';
 import 'tachibana_gallery_page.dart';
+import 'update_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -36,6 +37,14 @@ class _MainScreenState extends State<MainScreen> {
     const SketchbookPage(),
     const TachibanaPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      UpdateService().checkForUpdates(context);
+    });
+  }
 
   void _onItemTapped(int index) {
     setState(() {

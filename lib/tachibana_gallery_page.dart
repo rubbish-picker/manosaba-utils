@@ -9,6 +9,8 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'update_service.dart';
+
 class TachibanaPage extends StatefulWidget {
   const TachibanaPage({super.key});
 
@@ -316,7 +318,8 @@ class _TachibanaPageState extends State<TachibanaPage> {
           .create();
       await file.writeAsBytes(pngBytes);
 
-      await Share.shareXFiles([XFile(file.path)], text: '分享自 Tachibana\'s Gallery');
+      await Share.shareXFiles([XFile(file.path)],
+          text: '分享自 Tachibana\'s Gallery');
     } catch (e) {
       debugPrint('Error sharing image: $e');
       if (mounted) {
@@ -361,6 +364,14 @@ class _TachibanaPageState extends State<TachibanaPage> {
       appBar: AppBar(
         title: const Text('Tachibana\'s Gallery'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          TextButton(
+            onPressed: () {
+              UpdateService().checkForUpdates(context, isManual: true);
+            },
+            child: const Text('检查更新'),
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -11,8 +11,14 @@ class UpdateService {
   static const String _owner = 'rubbish-picker';
   static const String _repo = 'manosaba-utils';
 
-  Future<void> checkForUpdates(BuildContext context) async {
+  Future<void> checkForUpdates(BuildContext context,
+      {bool isManual = false}) async {
     try {
+      if (isManual && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('正在检查更新...')),
+        );
+      }
       // 1. Get current app version
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
       Version currentVersion = Version.parse(packageInfo.version);
@@ -39,12 +45,28 @@ class UpdateService {
           if (context.mounted) {
             _showUpdateDialog(context, releaseData);
           }
+        } else if (isManual) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已经是最新版本')),
+            );
+          }
         }
       } else {
         debugPrint('Failed to fetch updates: ${response.statusCode}');
+        if (isManual && context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('检查更新失败: ${response.statusCode}')),
+          );
+        }
       }
     } catch (e) {
       debugPrint('Error checking for updates: $e');
+      if (isManual && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('检查更新出错: $e')),
+        );
+      }
     }
   }
 
@@ -60,7 +82,8 @@ class UpdateService {
               children: <Widget>[
                 Text('Version: ${releaseData['tag_name']}'),
                 const SizedBox(height: 8),
-                const Text('Downloading the latest version from GitHub. A proxy may be required in some regions.'),
+                const Text(
+                    'Downloading the latest version from GitHub. A proxy may be required in some regions.'),
               ],
             ),
           ),

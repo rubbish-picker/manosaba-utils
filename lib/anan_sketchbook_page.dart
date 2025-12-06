@@ -9,6 +9,8 @@ import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'update_service.dart';
+
 class SketchbookPage extends StatefulWidget {
   const SketchbookPage({super.key});
 
@@ -218,7 +220,8 @@ class _SketchbookPageState extends State<SketchbookPage> {
       await file.writeAsBytes(_generatedImageBytes!);
 
       // 分享
-      await Share.shareXFiles([XFile(file.path)], text: '分享自 Anan\'s Sketchbook');
+      await Share.shareXFiles([XFile(file.path)],
+          text: '分享自 Anan\'s Sketchbook');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -253,6 +256,14 @@ class _SketchbookPageState extends State<SketchbookPage> {
       appBar: AppBar(
         title: const Text('Anan\'s Sketchbook'),
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        actions: [
+          TextButton(
+            onPressed: () {
+              UpdateService().checkForUpdates(context, isManual: true);
+            },
+            child: const Text('检查更新'),
+          ),
+        ],
       ),
       body: Column(
         children: [

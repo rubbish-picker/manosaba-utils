@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart';
 import 'package:gal/gal.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -19,6 +18,7 @@ class SketchbookPage extends StatefulWidget {
 }
 
 class _SketchbookPageState extends State<SketchbookPage> {
+  static const platform = MethodChannel('com.example.anan_s_sketchbook/share');
   final TextEditingController _textController = TextEditingController();
   String _selectedEmotion = "普通";
   bool _isGenerating = false;
@@ -26,8 +26,24 @@ class _SketchbookPageState extends State<SketchbookPage> {
 
   final Rect _textArea = const Rect.fromLTWH(119, 450, 279, 175);
 
-  // 字体配置
-  final String _fontFamily = 'AppFont';
+  final TextEditingController _maxFontSizeController =
+      TextEditingController(text: "80");
+  final TextEditingController _outlineWidthController =
+      TextEditingController(text: "4");
+
+  final List<String> _fontFamilies = [
+    'AppFont',
+    'Microsoft YaHei',
+    'Microsoft YaHei Bold',
+    'Microsoft YaHei Light',
+    'SimHei',
+    'Source Han Serif SC',
+  ];
+  String _selectedFont = 'Microsoft YaHei Bold';
+
+  Color _highlightColor = const Color.fromARGB(255, 128, 0, 128);
+  Color _outlineColor = Colors.white;
+  bool _isOutline = false;
 
   // 表情映射
   final Map<String, String> _emotionMap = {
@@ -57,7 +73,8 @@ class _SketchbookPageState extends State<SketchbookPage> {
     return completer.future;
   }
 
-  TextSpan _buildTextSpan(String text, double fontSize) {
+  TextSpan _buildTextSpan(
+      String text, TextStyle normalStyle, TextStyle highlightStyle) {
     final List<InlineSpan> children = [];
     final RegExp exp = RegExp(r'([【\[].*?[】\]])'); // 匹配中括号内容
 
@@ -67,11 +84,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
         children.add(
           TextSpan(
             text: m.group(0),
-            style: TextStyle(
-              color: const Color.fromARGB(255, 128, 0, 128),
-              fontSize: fontSize,
-              fontFamily: _fontFamily,
-            ),
+            style: highlightStyle,
           ),
         );
         return m.group(0)!;
@@ -81,11 +94,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
         children.add(
           TextSpan(
             text: n,
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: fontSize,
-              fontFamily: _fontFamily,
-            ),
+            style: normalStyle,
           ),
         );
         return n;
@@ -120,16 +129,33 @@ class _SketchbookPageState extends State<SketchbookPage> {
       if (_textController.text.isNotEmpty) {
         // 计算字号
         double minSize = 10.0;
-        double maxSize = 100.0;
+        double maxSize = double.tryParse(_maxFontSizeController.text) ?? 80.0;
+        double outlineWidth =
+            double.tryParse(_outlineWidthController.text) ?? 4.0;
 
         // 二分查找合适的字号
 
         double currentSize = maxSize;
         TextPainter? bestPainter;
 
+        // Base styles for layout calculation (fill style is enough for size)
+        TextStyle baseNormalStyle = TextStyle(
+          color: Colors.black,
+          fontFamily: _selectedFont,
+          fontWeight: FontWeight.normal,
+        );
+        TextStyle baseHighlightStyle = TextStyle(
+          color: _highlightColor,
+          fontFamily: _selectedFont,
+          fontWeight: FontWeight.normal,
+        );
+
         while (currentSize >= minSize) {
-          final TextSpan span =
-              _buildTextSpan(_textController.text, currentSize);
+          final TextSpan span = _buildTextSpan(
+            _textController.text,
+            baseNormalStyle.copyWith(fontSize: currentSize),
+            baseHighlightStyle.copyWith(fontSize: currentSize),
+          );
           final TextPainter painter = TextPainter(
             text: span,
             textAlign: TextAlign.center,
@@ -148,19 +174,56 @@ class _SketchbookPageState extends State<SketchbookPage> {
 
         // default
         if (bestPainter == null) {
-          final TextSpan span = _buildTextSpan(_textController.text, minSize);
+          final TextSpan span = _buildTextSpan(
+            _textController.text,
+            baseNormalStyle.copyWith(fontSize: minSize),
+            baseHighlightStyle.copyWith(fontSize: minSize),
+          );
           bestPainter = TextPainter(
             text: span,
             textAlign: TextAlign.center,
             textDirection: TextDirection.ltr,
           );
           bestPainter.layout(maxWidth: _textArea.width);
+          currentSize = minSize;
         }
 
         final double x =
             _textArea.left + (_textArea.width - bestPainter.width) / 2;
         final double y =
             _textArea.top + (_textArea.height - bestPainter.height) / 2;
+
+        // Draw Outline
+        if (_isOutline && outlineWidth > 0) {
+          TextStyle outlineNormalStyle = TextStyle(
+            fontFamily: _selectedFont,
+            fontSize: currentSize,
+            fontWeight: FontWeight.normal,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = outlineWidth * 2
+              ..color = _outlineColor,
+          );
+          TextStyle outlineHighlightStyle = TextStyle(
+            fontFamily: _selectedFont,
+            fontSize: currentSize,
+            fontWeight: FontWeight.normal,
+            foreground: Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = outlineWidth * 2
+              ..color = _outlineColor,
+          );
+
+          final TextSpan outlineSpan = _buildTextSpan(
+              _textController.text, outlineNormalStyle, outlineHighlightStyle);
+          final TextPainter outlinePainter = TextPainter(
+            text: outlineSpan,
+            textAlign: TextAlign.center,
+            textDirection: TextDirection.ltr,
+          );
+          outlinePainter.layout(maxWidth: _textArea.width);
+          outlinePainter.paint(canvas, Offset(x, y));
+        }
 
         bestPainter.paint(canvas, Offset(x, y));
       }
@@ -171,7 +234,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
           final ui.Image overlayImg = await _loadImage(_overlayImage);
           canvas.drawImage(overlayImg, Offset.zero, Paint());
         } catch (e) {
-          print("Overlay image not found or failed to load: $e");
+          debugPrint("Overlay image not found or failed to load: $e");
         }
       }
 
@@ -193,7 +256,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
         });
       }
     } catch (e) {
-      print(e);
+      debugPrint(e.toString());
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -215,13 +278,23 @@ class _SketchbookPageState extends State<SketchbookPage> {
       // 保存到临时文件并分享
       final tempDir = await getTemporaryDirectory();
       final file = await File(
-        '${tempDir.path}/sketchbook_share.png',
+        '${tempDir.path}/anan_sketchbook_${DateTime.now().millisecondsSinceEpoch}.png',
       ).create();
       await file.writeAsBytes(_generatedImageBytes!);
 
-      // 分享
-      await Share.shareXFiles([XFile(file.path)],
-          text: '分享自 Anan\'s Sketchbook');
+      if (Platform.isAndroid) {
+        try {
+          await platform.invokeMethod('shareToWeChatOrQQ', {'path': file.path});
+        } catch (e) {
+          // Fallback to standard share if native method fails
+          await Share.shareXFiles([XFile(file.path)],
+              text: '分享自 Anan\'s Sketchbook');
+        }
+      } else {
+        // 分享
+        await Share.shareXFiles([XFile(file.path)],
+            text: '分享自 Anan\'s Sketchbook');
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -290,7 +363,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),
@@ -326,29 +399,189 @@ class _SketchbookPageState extends State<SketchbookPage> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Row 2: Emotion Dropdown
-                    DropdownButtonFormField<String>(
-                      initialValue: _selectedEmotion,
-                      decoration: const InputDecoration(
-                        labelText: '选择表情',
-                        border: OutlineInputBorder(),
-                        contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        isDense: true,
-                      ),
-                      items: _emotionMap.keys.map((String key) {
-                        return DropdownMenuItem<String>(
-                            value: key, child: Text(key));
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        if (newValue != null) {
-                          setState(() {
-                            _selectedEmotion = newValue;
-                          });
-                          _generateImage();
-                        }
-                      },
+                    // Row 2: Emotion & Font
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedEmotion,
+                            decoration: const InputDecoration(
+                              labelText: '选择表情',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: _emotionMap.keys.map((String key) {
+                              return DropdownMenuItem<String>(
+                                  value: key, child: Text(key));
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  _selectedEmotion = newValue;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: _selectedFont,
+                            decoration: const InputDecoration(
+                              labelText: '字体',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              isDense: true,
+                            ),
+                            isExpanded: true,
+                            items: _fontFamilies.map((String font) {
+                              return DropdownMenuItem<String>(
+                                value: font,
+                                child: Text(
+                                  font,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13),
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (String? newValue) {
+                              if (newValue != null) {
+                                setState(() {
+                                  _selectedFont = newValue;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
+                    const SizedBox(height: 12),
+
+                    // Toggles & Settings
+                    Row(
+                      children: [
+                        // Outline
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _isOutline = !_isOutline;
+                            });
+                          },
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Checkbox(
+                                value: _isOutline,
+                                onChanged: (v) {
+                                  setState(() {
+                                    _isOutline = v ?? false;
+                                  });
+                                },
+                                visualDensity: VisualDensity.compact,
+                              ),
+                              const Text('描边'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Outline Width
+                        if (_isOutline)
+                          Expanded(
+                            child: SizedBox(
+                              height: 40,
+                              child: TextField(
+                                controller: _outlineWidthController,
+                                decoration: const InputDecoration(
+                                  labelText: '宽度',
+                                  border: OutlineInputBorder(),
+                                  contentPadding:
+                                      EdgeInsets.symmetric(horizontal: 8),
+                                ),
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 8),
+                        // Max Font Size
+                        Expanded(
+                          child: SizedBox(
+                            height: 40,
+                            child: TextField(
+                              controller: _maxFontSizeController,
+                              decoration: const InputDecoration(
+                                labelText: '最大字号',
+                                border: OutlineInputBorder(),
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // Outline Color Picker
+                    if (_isOutline) ...[
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 40,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            const Center(
+                                child: Text('描边: ',
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.bold))),
+                            const SizedBox(width: 8),
+                            ...[
+                              Colors.white,
+                              Colors.black,
+                              Colors.red,
+                              Colors.blue,
+                              Colors.yellow,
+                              Colors.green,
+                              Colors.purple,
+                              Colors.orange,
+                            ].map((Color color) {
+                              return GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _outlineColor = color;
+                                  });
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _outlineColor == color
+                                          ? Colors.grey
+                                          : Colors.grey.withValues(alpha: 0.3),
+                                      width: _outlineColor == color ? 2.0 : 1.0,
+                                    ),
+                                  ),
+                                  child: _outlineColor == color
+                                      ? Icon(Icons.check,
+                                          size: 16,
+                                          color: color.computeLuminance() > 0.5
+                                              ? Colors.black
+                                              : Colors.white)
+                                      : null,
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 16),
 
                     // Row 3: Buttons

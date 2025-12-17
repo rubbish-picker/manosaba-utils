@@ -19,6 +19,7 @@ class TachibanaPage extends StatefulWidget {
 }
 
 class _TachibanaPageState extends State<TachibanaPage> {
+  static const platform = MethodChannel('com.example.anan_s_sketchbook/share');
   final TextEditingController _textController = TextEditingController();
   final TextEditingController _maxFontSizeController =
       TextEditingController(text: "80");
@@ -50,7 +51,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
 
   Color _textColor = Colors.white;
   Color _outlineColor = Colors.black;
-  bool _isBold = false;
   bool _isOutline = false;
 
   ui.Image? _generatedImage;
@@ -110,7 +110,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
       final String fontFamily = _selectedFont;
       final Color textColor = _textColor;
       final Color outlineColor = _outlineColor;
-      final bool isBold = _isBold;
       final bool isOutline = _isOutline;
       final double maxFontSize =
           double.tryParse(_maxFontSizeController.text) ?? 80;
@@ -123,7 +122,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
         fontFamily,
         textColor,
         outlineColor,
-        isBold,
         isOutline,
         maxFontSize,
         outlineWidth,
@@ -152,7 +150,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
     String fontFamily,
     Color textColor,
     Color outlineColor,
-    bool isBold,
     bool isOutline,
     double maxFontSize,
     double outlineWidth,
@@ -185,7 +182,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
         fontFamily,
         textColor,
         outlineColor,
-        isBold,
         isOutline,
         maxFontSize,
         outlineWidth,
@@ -203,7 +199,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
     String fontFamily,
     Color textColor,
     Color outlineColor,
-    bool isBold,
     bool isOutline,
     double startFontSize,
     double outlineWidth,
@@ -224,7 +219,7 @@ class _TachibanaPageState extends State<TachibanaPage> {
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: currentFontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontWeight: FontWeight.normal,
             color: textColor,
           ),
         ),
@@ -251,7 +246,7 @@ class _TachibanaPageState extends State<TachibanaPage> {
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: minFontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontWeight: FontWeight.normal,
             color: textColor,
           ),
         ),
@@ -279,7 +274,7 @@ class _TachibanaPageState extends State<TachibanaPage> {
           style: TextStyle(
             fontFamily: fontFamily,
             fontSize: finalPainter.text!.style!.fontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+            fontWeight: FontWeight.normal,
             foreground: Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = outlineWidth * 2
@@ -314,12 +309,21 @@ class _TachibanaPageState extends State<TachibanaPage> {
       // Use share_plus to share/save
       final tempDir = await getTemporaryDirectory();
       final file = await File(
-              '${tempDir.path}/sherry_meme_${DateTime.now().millisecondsSinceEpoch}.png')
+              '${tempDir.path}/tachibana_gallery_${DateTime.now().millisecondsSinceEpoch}.png')
           .create();
       await file.writeAsBytes(pngBytes);
 
-      await Share.shareXFiles([XFile(file.path)],
-          text: '分享自 Tachibana\'s Gallery');
+      if (Platform.isAndroid) {
+        try {
+          await platform.invokeMethod('shareToWeChatOrQQ', {'path': file.path});
+        } catch (e) {
+          await Share.shareXFiles([XFile(file.path)],
+              text: '分享自 Tachibana\'s Gallery');
+        }
+      } else {
+        await Share.shareXFiles([XFile(file.path)],
+            text: '分享自 Tachibana\'s Gallery');
+      }
     } catch (e) {
       debugPrint('Error sharing image: $e');
       if (mounted) {
@@ -401,7 +405,7 @@ class _TachibanaPageState extends State<TachibanaPage> {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
+                    color: Colors.black.withValues(alpha: 0.1),
                     blurRadius: 4,
                     offset: const Offset(0, -2),
                   ),
@@ -434,7 +438,7 @@ class _TachibanaPageState extends State<TachibanaPage> {
                           child: DropdownButtonFormField<String>(
                             initialValue: _selectedBackground,
                             decoration: const InputDecoration(
-                              labelText: '背景图片',
+                              labelText: '选择表情',
                               border: OutlineInputBorder(),
                               contentPadding: EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 8),
@@ -557,32 +561,6 @@ class _TachibanaPageState extends State<TachibanaPage> {
                     // Row 4: Toggles & Settings
                     Row(
                       children: [
-                        // Bold
-                        InkWell(
-                          onTap: () {
-                            setState(() {
-                              _isBold = !_isBold;
-                            });
-                            _generateImage();
-                          },
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Checkbox(
-                                value: _isBold,
-                                onChanged: (v) {
-                                  setState(() {
-                                    _isBold = v ?? false;
-                                  });
-                                  _generateImage();
-                                },
-                                visualDensity: VisualDensity.compact,
-                              ),
-                              const Text('加粗'),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         // Outline
                         InkWell(
                           onTap: () {

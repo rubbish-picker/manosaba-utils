@@ -24,7 +24,7 @@ class _SketchbookPageState extends State<SketchbookPage> {
   bool _isGenerating = false;
   Uint8List? _generatedImageBytes;
 
-  final Rect _textArea = const Rect.fromLTWH(119, 450, 279, 175);
+  final Rect _textArea = const Rect.fromLTWH(108.5, 450, 300, 175);
 
   final TextEditingController _maxFontSizeController =
       TextEditingController(text: "80");
@@ -44,6 +44,12 @@ class _SketchbookPageState extends State<SketchbookPage> {
   Color _highlightColor = const Color.fromARGB(255, 128, 0, 128);
   Color _outlineColor = Colors.white;
   bool _isOutline = false;
+
+  // 边距设置
+  final TextEditingController _paddingHorizontalController =
+      TextEditingController(text: "0");
+  final TextEditingController _paddingVerticalController =
+      TextEditingController(text: "0");
 
   // 表情映射
   final Map<String, String> _emotionMap = {
@@ -135,6 +141,14 @@ class _SketchbookPageState extends State<SketchbookPage> {
 
         // 二分查找合适的字号
 
+        // 先获取边距值和计算可用区域
+        double paddingHorizontal =
+            double.tryParse(_paddingHorizontalController.text) ?? 0;
+        double paddingVertical =
+            double.tryParse(_paddingVerticalController.text) ?? 0;
+        double availableWidth = _textArea.width - paddingHorizontal * 2;
+        double availableHeight = _textArea.height - paddingVertical * 2;
+
         double currentSize = maxSize;
         TextPainter? bestPainter;
 
@@ -158,13 +172,13 @@ class _SketchbookPageState extends State<SketchbookPage> {
           );
           final TextPainter painter = TextPainter(
             text: span,
-            textAlign: TextAlign.center,
             textDirection: TextDirection.ltr,
+            textAlign: TextAlign.center,
           );
 
-          painter.layout(maxWidth: _textArea.width);
+          painter.layout(maxWidth: availableWidth);
 
-          if (painter.height <= _textArea.height) {
+          if (painter.height <= availableHeight) {
             bestPainter = painter;
             break; // 找到了最大的能放下的
           }
@@ -181,17 +195,20 @@ class _SketchbookPageState extends State<SketchbookPage> {
           );
           bestPainter = TextPainter(
             text: span,
-            textAlign: TextAlign.center,
             textDirection: TextDirection.ltr,
+            textAlign: TextAlign.center,
           );
-          bestPainter.layout(maxWidth: _textArea.width);
+          bestPainter.layout(maxWidth: availableWidth);
           currentSize = minSize;
         }
 
-        final double x =
-            _textArea.left + (_textArea.width - bestPainter.width) / 2;
-        final double y =
-            _textArea.top + (_textArea.height - bestPainter.height) / 2;
+        // 计算位置（居中显示）
+        double x = _textArea.left +
+            paddingHorizontal +
+            (availableWidth - bestPainter.width) / 2;
+        double y = _textArea.top +
+            paddingVertical +
+            (availableHeight - bestPainter.height) / 2;
 
         // Draw Outline
         if (_isOutline && outlineWidth > 0) {
@@ -218,10 +235,10 @@ class _SketchbookPageState extends State<SketchbookPage> {
               _textController.text, outlineNormalStyle, outlineHighlightStyle);
           final TextPainter outlinePainter = TextPainter(
             text: outlineSpan,
-            textAlign: TextAlign.center,
             textDirection: TextDirection.ltr,
+            textAlign: TextAlign.center,
           );
-          outlinePainter.layout(maxWidth: _textArea.width);
+          outlinePainter.layout(maxWidth: availableWidth);
           outlinePainter.paint(canvas, Offset(x, y));
         }
 
@@ -455,6 +472,44 @@ class _SketchbookPageState extends State<SketchbookPage> {
                                 });
                               }
                             },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Row 3: 边距设置
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 40,
+                            child: TextField(
+                              controller: _paddingHorizontalController,
+                              decoration: const InputDecoration(
+                                labelText: '左右边距',
+                                border: OutlineInputBorder(),
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: SizedBox(
+                            height: 40,
+                            child: TextField(
+                              controller: _paddingVerticalController,
+                              decoration: const InputDecoration(
+                                labelText: '上下边距',
+                                border: OutlineInputBorder(),
+                                contentPadding:
+                                    EdgeInsets.symmetric(horizontal: 8),
+                              ),
+                              keyboardType: TextInputType.number,
+                            ),
                           ),
                         ),
                       ],
